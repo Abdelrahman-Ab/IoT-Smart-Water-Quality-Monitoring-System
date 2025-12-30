@@ -1,0 +1,31 @@
+import glob
+import time
+from gpiozero import LED
+from threading import Lock
+
+temperature_data = {"temp": None}
+lock = Lock()
+TEMP_THRESHOLD = 26.0
+led = LED(16)
+
+def read_temp():
+    devices = glob.glob('/sys/bus/w1/devices/28-*')
+    if not devices:
+        return None
+    with open(devices[0] + '/w1_slave', 'r') as f:
+        lines = f.readlines()
+    if "YES" not in lines[0]:
+        return None
+    equals_pos = lines[1].find("t=")
+    return float(lines[1][equals_pos + 2:]) / 1000.0
+
+def temp_thread():
+    while True:
+        temp = read_temp()
+        with lock:
+            temperature_data["temp"] = temp
+        if temp is not None and temp >= TEMP_THRESHOLD:
+            led.on()
+        else:
+            led.off()
+        time.sleep(1)
