@@ -1,0 +1,56 @@
+import spidev
+import time
+import threading
+from threading import Lock
+
+# Shared sensor data
+adc_data = {
+    "ch0": 0, "v0": 0.0, "ppm": 0.0,
+    "ch1": 0, "v1": 0.0, "turbidity": 0.0,
+    "ch2": 0, "v2": 0.0, "ph": 0.0
+}
+lock = Lock()
+
+# MCP3008 SPI setup
+spi = spidev.SpiDev()
+spi.open(0, 0)
+spi.max_speed_hz = 1350000
+VREF = 5.0
+
+def read_raw(ch):
+    adc = spi.xfer2([1, (8 + ch) << 4, 0])
+    return ((adc[1] & 3) << 8) + adc[2]
+
+def to_voltage(raw, vref=VREF):
+    return (raw / 1023.0) * vref
+
+def ch0_ppm(voltage):
+    return (voltage * 1000) / 2.3
+
+def ch1_turbidity(voltage):
+    return (voltage * 1000) / 4.5
+
+def ch2_ph(voltage):
+    ph = -7.5862 * voltage + 25.9655
+    return max(0.0, min(14.0, ph))
+
+def adc_thread():
+    while True:
+        raw0 = read_raw(0)
+        v0 = to_voltage(raw0)
+        ppm = ch0_ppm(v0)
+
+        raw1 = read_raw(1)
+        v1 = to_voltage(raw1)
+        turbidity = ch1_turbidity(v1)
+
+        raw2 = read_raw(2)
+        v2 = to_voltage(raw2)
+        ph = ch2_ph(v2)
+
+        with lock:
+            adc_data["ch0"], adc_data["v0"], adc_data["ppm"] = raw0, v0, ppm
+            adc_data["ch1"], adc_data["v1"], adc_data["turbidity"] = raw1, v1, turbidity
+            adc_data["ch2"], adc_data["v2"], adc_data["ph"] = raw2, v2, ph
+
+        time.sleep(0.1)
