@@ -1,0 +1,22 @@
+import joblib
+import numpy as np
+import os
+
+MODEL_FILE = "model.pkl"
+
+if not os.path.exists(MODEL_FILE):
+    print(f" AI Model file not found: {MODEL_FILE}")
+    exit(1)
+
+classifier_model = joblib.load(MODEL_FILE)
+print(" AI Model Loaded:", MODEL_FILE)
+
+def ai_classify(ppm, turbidity, ph, temperature):
+    X = np.array([[ppm, turbidity, ph, temperature]])
+    return classifier_model.predict(X)[0]
+
+def ai_classify_with_confidence(ppm, turbidity, ph, temperature):
+    X = np.array([[ppm, turbidity, ph, temperature]])
+    pred = classifier_model.predict(X)[0]
+    conf = classifier_model.predict_proba(X).max()
+    return pred, conf
